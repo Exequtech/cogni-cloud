@@ -2,3 +2,7 @@
 mosquitto/log/
 mosquitto/data/
 influxdb-data/
+mongo-data/
+app/node_modules/
+app/dist/
+*.tsbuildinfo

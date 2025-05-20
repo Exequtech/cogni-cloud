@@ -24,15 +24,42 @@ services:
       - influxdb
     environment:
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-mytoken}
-      MQTT_URL: ${MQTT_URL:-tcp://mosquitto:1883}
+      MQTT_URL: "${TELEGRAF_MQTT_URL:-ssl://${MQTT_DOMAIN:-mosquitto}:8883}"
+      INSECURE_SKIP_VERIFY: "${TELEGRAF_INSECURE_SKIP_VERIFY:-true}"
 
   mosquitto:
     image: eclipse-mosquitto:latest
-    ports:
-      - "1883:1883"
     volumes:
-      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/config:/mosquitto/config:ro
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
+      - "${TLS_CERT_DIR:-./self-signed-certs/${TLS_CERTFILE:-fullchain.pem}}:/mosquitto/certs/fullchain.pem:ro"
+      - "${TLS_CERT_DIR:-./self-signed-certs/${TLS_KEYFILE:-privkey.pem}}:/mosquitto/certs/privkey.pem:ro"
     profiles:
-      - mqttbroker
+      - mosquitto
+    ports:
+      - "${MOSQUITTO_PORT:-8883}:8883"
+
+  mongo:
+    image: mongo:latest
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ohno
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PWD:-rootpass}
+      MONGO_INITDB_DATABASE: cogniflight
+    volumes:
+      - ./mongo-data:/data/db
+    profiles:
+      - mongo
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+
+  app:
+    build: ./app
+    environment:
+      MONGO_URI: "${MONGO_URI:-mongodb://ohno:${MONGO_PWD:-rootpass}@mongo:27017/cogniflight?authSource=admin}"
+      MQTT_URI: "${MQTT_URI:-mqtts://${MQTT_DOMAIN:-mosquitto}}"
+      APP_ENV: ${APP_ENV:-DEV}
+    volumes:
+      - ./app:/usr/src/app
+
